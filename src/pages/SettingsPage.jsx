@@ -8,7 +8,6 @@ function SettingsPage() {
   const [settings, setSettings] = useState({
     emailNotifications: true,
     browserNotifications: false,
-    theme: "light",
     language: "English"
   });
 
@@ -25,12 +24,12 @@ function SettingsPage() {
   const handleSave = (e) => {
     e.preventDefault();
 
-    // حفظ الإعدادات في localStorage لتطبيقها لو حابب
+    // حفظ الإعدادات في localStorage
     localStorage.setItem("appSettings", JSON.stringify(settings));
 
     setSuccessMessage("Settings saved successfully! Redirecting...");
     
-    // الانتقال التلقائي لصفحة الريكويست بعد ثغرة قصيرة
+    // الانتقال التلقائي لصفحة الريكويست بعد فترة قصيرة
     setTimeout(() => {
       navigate("/requests");
     }, 1000);
@@ -89,26 +88,13 @@ function SettingsPage() {
 
           <hr className="my-4" />
 
-          <h4 className="fw-bold mb-3">Appearance & Preferences</h4>
-          <div className="row g-3 mb-4">
-            <div className="col-md-6">
-              <label className="form-label fw-semibold text-muted">Theme Mode</label>
+          <h4 className="fw-bold mb-3">Preferences</h4>
+          {/* تم تصغير حجم الـ select وتوسيطه باستخدام d-flex justify-content-center */}
+          <div className="row justify-content-center mb-4">
+            <div className="col-md-6 col-lg-4 text-center">
+              <label className="form-label fw-semibold text-muted d-block">Language</label>
               <select
-                className="form-select"
-                name="theme"
-                value={settings.theme}
-                onChange={handleChange}
-              >
-                <option value="light">Light Mode</option>
-                <option value="dark">Dark Mode</option>
-                <option value="system">System Default</option>
-              </select>
-            </div>
-
-            <div className="col-md-6">
-              <label className="form-label fw-semibold text-muted">Language</label>
-              <select
-                className="form-select"
+                className="form-select text-center"
                 name="language"
                 value={settings.language}
                 onChange={handleChange}
