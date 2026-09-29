@@ -1,27 +1,46 @@
+// src/pages/RequestDetailsPage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { fetchRequestById, updateRequestApi } from "../services/mockApi";
+import { translations } from "../utils/translations";
+import Swal from "sweetalert2";
 
 function RequestDetailsPage() {
-  const { id } = useParams(); // استخراج الـ ID من الـ URL لفتح الطلب المناسب
+  const { id } = useParams();
   const navigate = useNavigate();
 
-  // بيانات الطلب الوهمية (مع دعم جلب الطلب بناءً على الـ ID)
-  const [request, setRequest] = useState({
-    id: Number(id) || 1,
-    title: "Update Landing Page Hero Section",
-    status: "In Progress",
-    priority: "High",
-    owner: "Omar",
-    createdAt: "2026-09-20 10:30 AM",
-    updatedAt: "2026-09-24 02:15 PM"
-  });
+  const currentLang = localStorage.getItem("appSettings") 
+    ? JSON.parse(localStorage.getItem("appSettings")).language 
+    : "English";
+  const t = translations[currentLang] || translations.English;
 
+  const [request, setRequest] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState(request);
+  const [formData, setFormData] = useState({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  // تتبع التعديلات لمعرفة هل هناك تغييرات غير محفوظة
   useEffect(() => {
+    const getDetails = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await fetchRequestById(id);
+        setRequest(data);
+        setFormData({ ...data });
+      } catch (err) {
+        setError(err.message || "Failed to fetch request details.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    getDetails();
+  }, [id]);
+
+  useEffect(() => {
+    if (!request) return;
     const isChanged = 
       formData.title !== request.title ||
       formData.status !== request.status ||
@@ -31,7 +50,6 @@ function RequestDetailsPage() {
     setHasUnsavedChanges(isChanged);
   }, [formData, request]);
 
-  // حماية إغلاق الصفحة أو الخروج في حال وجود تعديلات غير محفوظة
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (hasUnsavedChanges) {
@@ -43,25 +61,52 @@ function RequestDetailsPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
-  // حفظ التعديلات
-  const handleSave = (e) => {
+  // ===== ✅ الحفظ — بيبعت كل الحقول (Title + Status + Priority + Owner) =====
+  const handleSave = async (e) => {
     e.preventDefault();
-    setRequest({
-      ...formData,
-      updatedAt: new Date().toLocaleString()
-    });
-    setIsEditing(false);
-    setHasUnsavedChanges(false);
+    setSaving(true);
+    try {
+      const updated = await updateRequestApi(request.id, {
+        title: formData.title,
+        status: formData.status,
+        priority: formData.priority, // ✅ دي اللي كانت مش بتتحفظ
+        owner: formData.owner,
+      });
+      // الـ API بيرجع الطلب المحدّث (بما فيه updatedAt الجديد تلقائياً)
+      setRequest(updated);
+      setFormData({ ...updated });
+      setIsEditing(false);
+      setHasUnsavedChanges(false);
+      Swal.fire("Success", "Request updated successfully!", "success");
+    } catch (err) {
+      Swal.fire("Error", "Failed to update request on server.", "error");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // إلغاء التعديل والرجوع للقيم الأصلية
   const handleCancel = () => {
     if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Are you sure you want to discard them?")) {
       return;
     }
-    setFormData(request);
+    setFormData({ ...request });
     setIsEditing(false);
   };
+
+  if (loading) {
+    return <div className="text-center py-5">Loading request details from server...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="container py-5 text-center">
+        <div className="alert alert-danger" role="alert">{error}</div>
+        <button className="btn btn-secondary mt-3" onClick={() => navigate("/requests")}>
+          Back to Requests
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="container-fluid px-0">
@@ -103,8 +148,18 @@ function RequestDetailsPage() {
                 type="submit"
                 form="request-form"
                 className="btn btn-success"
+                disabled={saving}
               >
-                <i className="bi bi-check-lg me-1"></i> Save Changes
+                {saving ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm me-1"></span>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <i className="bi bi-check-lg me-1"></i> Save Changes
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -130,7 +185,7 @@ function RequestDetailsPage() {
                 <input
                   type="text"
                   className="form-control"
-                  value={formData.title}
+                  value={formData.title || ""}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   required
                 />
@@ -145,7 +200,7 @@ function RequestDetailsPage() {
               {isEditing ? (
                 <select
                   className="form-select"
-                  value={formData.status}
+                  value={formData.status || ""}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 >
                   <option value="Pending">Pending</option>
@@ -168,7 +223,7 @@ function RequestDetailsPage() {
               {isEditing ? (
                 <select
                   className="form-select"
-                  value={formData.priority}
+                  value={formData.priority || ""}
                   onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
                 >
                   <option value="High">High</option>
@@ -191,7 +246,7 @@ function RequestDetailsPage() {
                 <input
                   type="text"
                   className="form-control"
-                  value={formData.owner}
+                  value={formData.owner || ""}
                   onChange={(e) => setFormData({ ...formData, owner: e.target.value })}
                   required
                 />
@@ -205,11 +260,11 @@ function RequestDetailsPage() {
             {/* Timestamps */}
             <div className="col-md-6">
               <small className="text-muted d-block">Created At</small>
-              <span className="fw-medium text-secondary">{request.createdAt}</span>
+              <span className="fw-medium text-secondary">{request.createdAt || "N/A"}</span>
             </div>
             <div className="col-md-6">
               <small className="text-muted d-block">Updated At</small>
-              <span className="fw-medium text-secondary">{request.updatedAt}</span>
+              <span className="fw-medium text-secondary">{request.updatedAt || request.createdAt || "N/A"}</span>
             </div>
           </div>
         </form>
